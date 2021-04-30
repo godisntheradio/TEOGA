@@ -1839,9 +1839,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   PointsContainer: {fileID: 1791116491}
-  AngleLinesMaterial: {fileID: 2100000, guid: 6be20d3cb5d5d9f449c73c6f97db3939, type: 2}
-  LineHullMaterial: {fileID: 0}
-  LinePathMaterial: {fileID: 0}
+  AnglesMeshMaterial: {fileID: 2100000, guid: 6be20d3cb5d5d9f449c73c6f97db3939, type: 2}
+  HullMeshMaterial: {fileID: 2100000, guid: a13e0d5cdb6e5a747bb41417f8058240, type: 2}
+  PathMeshMaterial: {fileID: 2100000, guid: d6ab9364e8793c943940ed0ae099604f, type: 2}
 --- !u!4 &1642158762
 Transform:
   m_ObjectHideFlags: 0
@@ -1850,7 +1850,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1642158760}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 1.2797842, y: -4.688323, z: 14.815153}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children: []
   m_Father: {fileID: 0}

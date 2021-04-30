@@ -6,72 +6,114 @@ using System.Threading.Tasks;
 using UnityEngine;
 namespace ConvexHull
 {
+    
 
     class Point
     {
-        public Vector3 position;
+        public Vector3 Position { get => pointObject.transform.position; }
 
         public float angle;
 
-        public GameObject objectRef;
+        public GameObject pointObject;
 
-        public Point(Vector3 p, GameObject objectRef)
+        public Point(GameObject pointObject)
         {
-            this.position = p;
-            this.angle = PolarAngle(p);
-            this.objectRef = objectRef;
+            this.pointObject = pointObject;
         }
 
         public float PolarAngle(Vector3 p)
         {
             return Mathf.Atan(p.y / p.x);
         }
+
+        public void SetPolarAngle(Vector3 vector)
+        {
+            this.angle = PolarAngle(vector);
+        }
     }
 
 
     class CHGraham
     {
-        private List<GameObject> ObjectList;
-        public GameObject SmallestY;
+        public Point SmallestY;
         private List<Point> Points;
-        public List<GameObject> Hull;
+        public List<Point> Hull;
 
         public CHGraham(List<GameObject> points)
         {
-            ObjectList = points;
-            Hull = new List<GameObject>();
+            Hull = new List<Point>();
             Points = new List<Point>();
+            foreach (var item in points)
+            {
+                Points.Add(new Point(item));
+            }
         }
 
         public void FindSmallestY()
         {
-            SmallestY = ObjectList.OrderBy((i) => i.transform.position.y).FirstOrDefault();
+            SmallestY = Points.OrderBy((i) => i.Position.y).FirstOrDefault();
         }
 
         public void CalculateConvexHull()
         {
             FindSmallestY();
 
-            ObjectList.Remove(SmallestY);
+            Points.Remove(SmallestY);
 
-            foreach (var item in ObjectList)
+            foreach (var item in Points)
             {
-                Points.Add(new Point(item.transform.position - SmallestY.transform.position, item));
+                item.SetPolarAngle(item.Position - SmallestY.Position);
             }
 
             Points = Points.OrderBy(p => p.angle < 0.0f).ThenBy(p => p.angle).ToList();
         }
 
-        public List<Vector3> GetVectorList()
+        public List<Vector3> GetAnglesVectorList()
         {
             var list = new List<Vector3>();
-            list.Add(SmallestY.transform.position);
+            list.Add(SmallestY.Position);
             foreach (var item in Points)
             {
-                list.Add(item.position);
+                list.Add(item.Position);
             }
-
             return list;
+        }
+
+        public List<Vector3> GetHullVectorList()
+        {
+            var list = new List<Vector3>();
+            foreach (var item in Hull)
+            {
+                list.Add(item.Position);
+            }
+            return list;
+        }
+
+        internal void CalculateHull()
+        {
+            Hull.Add(SmallestY);
+            Hull.Add(Points[0]);
+            for (int i = 1; i < Points.Count; i++)
+            {
+                Hull.Add(Points[i]);
+                var orientation = ComputeOrientation(Hull[Hull.Count - 2].Position, Points[i].Position, i + 1 == Points.Count ? Hull.First().Position : Points[i + 1].Position);
+                if (orientation < 0)
+                    Hull.RemoveAt(Hull.Count - 1);
+            }
+        }
+
+        public static float AngleBetweenVectors(Vector3 v1, Vector3 v2)
+        {
+            float dot = Vector3.Dot(v1, v2);
+            var result = Mathf.Acos(dot / (v1.magnitude * v2.magnitude));
+            return result * Mathf.Rad2Deg;
+        }
+
+        public static float ComputeOrientation(Vector3 p1, Vector3 p2, Vector3 p3)
+        {
+            return (p2.x - p1.x) * (p3.y - p1.y) - (p2.y - p1.y) * (p3.x - p1.x);
+            //Matrix4x4 mat = new Matrix4x4(new Vector4(p1.x, p1.y, p1.z, 0), new Vector4(p2.x, p2.y, p2.z, 0), new Vector4(p3.x, p3.y, p3.z, 0), new Vector4(0, 0, 0, 1));
+            //return Matrix4x4.Determinant(mat);
         }
     }
 }
