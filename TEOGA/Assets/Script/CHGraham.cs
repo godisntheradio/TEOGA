@@ -91,15 +91,41 @@ namespace ConvexHull
 
         internal void CalculateHull()
         {
+            LinkedList<Point> lPoints = new LinkedList<Point>(Points);
+            lPoints.AddFirst(SmallestY);
             Hull.Add(SmallestY);
             Hull.Add(Points[0]);
-            for (int i = 1; i < Points.Count; i++)
+            //for (var i = lPoints.First.Next.Next; i != null; i = i.Next)
+            var i = lPoints.First.Next.Next;
+            while (i != null)
             {
-                Hull.Add(Points[i]);
-                var orientation = ComputeOrientation(Hull[Hull.Count - 2].Position, Points[i].Position, i + 1 == Points.Count ? Hull.First().Position : Points[i + 1].Position);
-                if (orientation < 0)
+                var p1 = i.Previous.Value.Position;
+                var p2 = i.Value.Position;
+                var p3 = i.Next ==  null ? Hull.First().Position : i.Next.Value.Position;
+                var orientation = ComputeOrientation(p1, p2, p3);
+                if (orientation <= 0)
+                {
+                    i = i.Previous;
+                    lPoints.Remove(i.Next);
                     Hull.RemoveAt(Hull.Count - 1);
+                }
+                else
+                {
+                    Hull.Add(i.Value);
+                    i = i.Next;
+                }
             }
+            //for (int i = 1; i < Points.Count; i++)
+            //{
+            //    //lPoints.
+            //    Hull.Add(Points[i]);
+            //    var p1 = Hull[Hull.Count - 2].Position;
+            //    var p2 = Points[i].Position;
+            //    var p3 = i + 1 == lPoints.Count ? Hull.First().Position : Points[i + 1].Position;
+            //    var orientation = ComputeOrientation(p1, p2, p3);
+            //    if (orientation <= 0)
+            //        Hull.RemoveAt(Hull.Count - 1);
+            //}
         }
 
         public static float AngleBetweenVectors(Vector3 v1, Vector3 v2)
