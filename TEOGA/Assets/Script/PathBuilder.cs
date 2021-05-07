@@ -132,7 +132,7 @@ public class PathBuilder : MonoBehaviour
         BuildVoronoi();
     }
 
-    // calcula o diagrama de voronoi
+    // calcula o diagrama de voronoi                                                      link para a implementação utilizada: https://github.com/OskarSigvardsson/unity-delaunay
     // serve mais para ser usar a triangulação de delaunay do resultado do diagrama
     public void BuildVoronoi()
     {
