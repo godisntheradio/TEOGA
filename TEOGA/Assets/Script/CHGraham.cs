@@ -6,46 +6,19 @@ using System.Threading.Tasks;
 using UnityEngine;
 namespace ConvexHull
 {
-    
-
-    class Point
-    {
-        public Vector3 Position { get => pointObject.transform.position; }
-
-        public float angle;
-
-        public GameObject pointObject;
-
-        public Point(GameObject pointObject)
-        {
-            this.pointObject = pointObject;
-        }
-
-        public float PolarAngle(Vector3 p)
-        {
-            return Mathf.Atan(p.y / p.x);
-        }
-
-        public void SetPolarAngle(Vector3 vector)
-        {
-            this.angle = PolarAngle(vector);
-        }
-    }
-
-
     class CHGraham
     {
-        public Point SmallestY;
-        private List<Point> Points;
-        public List<Point> Hull;
+        public GrahamPoint SmallestY;
+        private List<GrahamPoint> Points;
+        public List<GrahamPoint> Hull;
 
         public CHGraham(List<GameObject> points)
         {
-            Hull = new List<Point>();
-            Points = new List<Point>();
+            Hull = new List<GrahamPoint>();
+            Points = new List<GrahamPoint>();
             foreach (var item in points)
             {
-                Points.Add(new Point(item));
+                Points.Add(new GrahamPoint(item));
             }
         }
 
@@ -64,13 +37,24 @@ namespace ConvexHull
             {
                 item.SetPolarAngle(item.Position - SmallestY.Position);
             }
-
+            // ordena no sentido anti horário
             Points = Points.OrderBy(p => p.angle < 0.0f).ThenBy(p => p.angle).ToList();
         }
 
         public List<Vector3> GetAnglesVectorList()
         {
             var list = new List<Vector3>();
+            list.Add(SmallestY.Position);
+            foreach (var item in Points)
+            {
+                list.Add(item.Position);
+            }
+            return list;
+        }
+
+        public List<Vector2> GetPointVectorList()
+        {
+            var list = new List<Vector2>();
             list.Add(SmallestY.Position);
             foreach (var item in Points)
             {
@@ -91,41 +75,34 @@ namespace ConvexHull
 
         internal void CalculateHull()
         {
-            LinkedList<Point> lPoints = new LinkedList<Point>(Points);
+            // usa uma lista encadeada para facilitar a remoção de itens no algorítmo
+            LinkedList<GrahamPoint> lPoints = new LinkedList<GrahamPoint>(Points);
+            // esse é um passo adicional por que na função CalculateConvexHull eu removo o ponto com menor Y da lista de pontos desse objeto CHGraham
             lPoints.AddFirst(SmallestY);
+            // o algorítmo mantém duas listas, a lista de pontos a serem analisados como uma lista encadeada
+            // e outra lista normal para manter os pontos do hull (poderia ter sido uma pilha)
             Hull.Add(SmallestY);
             Hull.Add(Points[0]);
-            //for (var i = lPoints.First.Next.Next; i != null; i = i.Next)
+            // começar a partir do 3º ponto da lista
             var i = lPoints.First.Next.Next;
             while (i != null)
             {
                 var p1 = i.Previous.Value.Position;
                 var p2 = i.Value.Position;
-                var p3 = i.Next ==  null ? Hull.First().Position : i.Next.Value.Position;
+                var p3 = i.Next ==  null ? Hull.First().Position : i.Next.Value.Position; // se o pivô (p2) for o ultimo da lista, o p3 seria o primeiro da lista
                 var orientation = ComputeOrientation(p1, p2, p3);
-                if (orientation <= 0)
+                if (orientation <= 0) // calcula a orientação de 3 pontos
                 {
-                    i = i.Previous;
-                    lPoints.Remove(i.Next);
-                    Hull.RemoveAt(Hull.Count - 1);
+                    i = i.Previous;                     // se o resultado for menor ou igual a zero, remover o pivô da lista de pontos a serem analisados e da lista do hull
+                    lPoints.Remove(i.Next);             // pois os 3 pontos formam um angulo concavo
+                    Hull.RemoveAt(Hull.Count - 1);      // o pivô passa a ser o anterior para o proximo calculo ser feito com o próximo depois do removido
                 }
                 else
                 {
-                    Hull.Add(i.Value);
+                    Hull.Add(i.Value);                  // adiciona no hull e vai pro próximo
                     i = i.Next;
                 }
             }
-            //for (int i = 1; i < Points.Count; i++)
-            //{
-            //    //lPoints.
-            //    Hull.Add(Points[i]);
-            //    var p1 = Hull[Hull.Count - 2].Position;
-            //    var p2 = Points[i].Position;
-            //    var p3 = i + 1 == lPoints.Count ? Hull.First().Position : Points[i + 1].Position;
-            //    var orientation = ComputeOrientation(p1, p2, p3);
-            //    if (orientation <= 0)
-            //        Hull.RemoveAt(Hull.Count - 1);
-            //}
         }
 
         public static float AngleBetweenVectors(Vector3 v1, Vector3 v2)

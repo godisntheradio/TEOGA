@@ -5,29 +5,47 @@ using UnityEngine;
 
 public class PathBuilder : MonoBehaviour
 {
+
+    public GraphScreen GraphScreen;
     public GameObject PointsContainer;
+    public GameObject Map;
 
-
-    List<GameObject> Points;
+    public List<MapLocation> Locations;
 
     CHGraham Graham;
 
+    GK.VoronoiDiagram Diagram;
+
+    Graph.Graph<MapLocation> LocationGraph;
 
     #region Visual
 
     public Material AnglesMeshMaterial;
     public Material HullMeshMaterial;
+    public Material VoronoiMeshMaterial;
+    public Material DelaunayMeshMaterial;
     public Material PathMeshMaterial;
 
     #endregion
 
     #region Result
 
+    private Matrix4x4 MeshMatrix;
+
     private Mesh AnglesMesh;
-    private Matrix4x4 AnglesMeshMatrix;
+    public bool ShowAnglesMesh;
 
     private Mesh HullMesh;
-    private Matrix4x4 HullMeshMatrix;
+    public bool ShowHullMesh;
+
+    private Mesh VoronoiMesh;
+    public bool ShowVoronoiMesh;
+
+    private Mesh DelaunayMesh;
+    public bool ShowDelaunayMesh;
+
+    private Mesh PathMesh;
+    public bool ShowPathMesh;
 
 
     #endregion
@@ -35,52 +53,147 @@ public class PathBuilder : MonoBehaviour
 
     void Start()
     {
-        Points = new List<GameObject>();
+
+        var points = new List<GameObject>();
+        Locations = new List<MapLocation>();
         foreach (Transform item in PointsContainer.transform)
         {
-            Points.Add(item.gameObject);
+            points.Add(item.gameObject);
+            Locations.Add(item.GetComponent<MapLocation>());
         }
-        Graham = new CHGraham(Points);
+        Graham = new CHGraham(points);
+        MeshMatrix = CreateMeshMatrix();
+
+        LocationGraph = new Graph.Graph<MapLocation>();
     }
 
-    // Update is called once per frame
     void Update()
     {
-        if (AnglesMesh != null)
+        if (AnglesMesh != null && ShowAnglesMesh)
         {
-            Graphics.DrawMesh(AnglesMesh, AnglesMeshMatrix, AnglesMeshMaterial, 0);
+            Graphics.DrawMesh(AnglesMesh, MeshMatrix, AnglesMeshMaterial, 0);
         }
 
-        if (HullMesh != null)
+        if (HullMesh != null && ShowHullMesh)
         {
-            Graphics.DrawMesh(HullMesh, HullMeshMatrix, HullMeshMaterial, 0);
+            Graphics.DrawMesh(HullMesh, MeshMatrix, HullMeshMaterial, 0);
+        }
+
+        if (VoronoiMesh != null && ShowVoronoiMesh)
+        {
+            Graphics.DrawMesh(VoronoiMesh, MeshMatrix, VoronoiMeshMaterial, 0);
+        }
+
+        if (DelaunayMesh != null && ShowDelaunayMesh)
+        {
+            Graphics.DrawMesh(DelaunayMesh, MeshMatrix, DelaunayMeshMaterial, 0);
+        }
+
+        if (PathMesh != null && ShowPathMesh)
+        {
+            Graphics.DrawMesh(PathMesh, MeshMatrix, PathMeshMaterial, 0);
         }
     }
 
+    // calcula o primeiro passo do graham scan
+    // no "void Start()" é feito uma lista de pontos que é passado para o objeto
+    // "CHGraham Graham" que acha o menor y e calcula o angulo polar de todos os outros pontos
     public void BeginProcessing()
     {
         Graham.CalculateConvexHull();
 
+        // aqui é um passo adicional para pegar uma lista de arestas formadas pelo ponto de menor y até todos os outros pontos e mostrar na tela
         var points = Graham.GetAnglesVectorList();
 
         AnglesMesh = CreateAngleLineMesh(ref points);
-        AnglesMeshMatrix = CreateMeshMatrix();
 
         BuildHull();
     }
 
+    // aqui é feito o calculo do hull em si
+    // mais detalhes nos comentários do CHGraham.CalculateHull
     public void BuildHull()
     {
         //Debug.Log(CHGraham.AngleBetweenVectors(new Vector3(3, -4, 5), new Vector3(2, 7, -3))); // resultado deve ser 131.647
         //Debug.Log(CHGraham.ComputeOrientation(new Vector3(1, 3, 10), new Vector3(9, 7, 4), new Vector3(5, 8, 2))); // resultado deve ser 358
+
+
         Graham.CalculateHull();
 
         var points = Graham.GetHullVectorList();
 
         HullMesh = CreateHullLineMesh(ref points);
-        HullMeshMatrix = CreateMeshMatrix();
+
+
+        BuildVoronoi();
     }
 
+    // calcula o diagrama de voronoi
+    // serve mais para ser usar a triangulação de delaunay do resultado do diagrama
+    public void BuildVoronoi()
+    {
+        var points2d = Graham.GetPointVectorList();
+        GK.VoronoiCalculator voronoiCalculator = new GK.VoronoiCalculator();
+        Diagram = voronoiCalculator.CalculateDiagram(Graham.GetPointVectorList());
+
+        //var extends = Map.GetComponent<MeshFilter>().mesh.bounds.size;
+        //extends.Scale(Map.transform.localScale);
+
+        VoronoiMesh = CreateVoronoiMesh(Diagram);
+
+
+        BuildGraph();
+    }
+
+    // cria a representação visual do diagrama de delaunay
+    // cria um grafo a partir do resultado da triangulação
+    public void BuildGraph()
+    {
+        var orderedLocations = new List<MapLocation>();
+        foreach (var item in Diagram.Triangulation.Vertices)
+        {
+            orderedLocations.Add(Locations.Find(i => i.IsEqualTo(item)));
+        }
+
+        LocationGraph.AddNodes(orderedLocations);
+
+        int[] indices = new int[Diagram.Triangulation.Triangles.Count * 3];
+
+        // separa cada triangulo em 3 segmentos de reta
+        int j = 0;
+        for (int i = 0; i < Diagram.Triangulation.Triangles.Count; i += 3)
+        {
+            indices[j] = Diagram.Triangulation.Triangles[i];
+            indices[j + 1] = Diagram.Triangulation.Triangles[i + 1];
+
+            indices[j + 2] = Diagram.Triangulation.Triangles[i + 1];
+            indices[j + 3] = Diagram.Triangulation.Triangles[i + 2];
+
+            indices[j + 4] = Diagram.Triangulation.Triangles[i + 2];
+            indices[j + 5] = Diagram.Triangulation.Triangles[i];
+
+            j += 6;
+        }
+
+        LocationGraph.CreateEdges(indices, (p, q) => Vector3.Distance(p.transform.position, q.transform.position));
+        DelaunayMesh = CreateTriangulationMesh(Diagram, indices);
+
+        GraphScreen.CreateDistances(LocationGraph);
+
+        BuildPath();
+    }
+    // calcula o A* 
+    public void BuildPath()
+    {
+        var originObj = Locations.Find((i) => i.name == "P_004");
+        var destinationObj = Locations.Find((i) => i.name == "P_007");
+
+        var origin = LocationGraph.FindNode((i) => i.Item == originObj);
+        var destination = LocationGraph.FindNode((i) => i.Item == destinationObj);
+
+        LocationGraph.CalculateHeuristics(destination.Item, (c, d) => Vector3.Distance(c.transform.position, d.transform.position));
+        LocationGraph.AStar(origin, destination);
+    }
 
     public static Mesh CreateAngleLineMesh(ref List<Vector3> points)
     {
@@ -103,6 +216,62 @@ public class PathBuilder : MonoBehaviour
         mesh.SetVertices(vertices);
         mesh.uv = uv;
         mesh.SetIndices(indices, MeshTopology.Lines, 0);
+
+        return mesh;
+    }
+
+    public static Mesh CreateVoronoiMesh(GK.VoronoiDiagram diagram)
+    {
+        Mesh mesh = new Mesh();
+
+        Vector3[] vertices = new Vector3[diagram.Vertices.Count];
+        Vector2[] uv = new Vector2[diagram.Vertices.Count];
+        int[] indices = new int[diagram.Edges.Count * 2];
+
+
+        for (int i = 0; i < diagram.Vertices.Count; i++)
+        {
+            vertices[i] = diagram.Vertices[i];
+            uv[i] = diagram.Vertices[i];
+        }
+
+        int j = 0;
+        for (int i = 0; i < diagram.Edges.Count; i++)
+        {
+            if (diagram.Edges[i].Type == GK.VoronoiDiagram.EdgeType.Segment)
+            {
+                indices[j] = diagram.Edges[i].Vert0;
+                indices[j + 1] = diagram.Edges[i].Vert1;
+
+                j += 2;
+            }
+        }
+
+        mesh.SetVertices(vertices);
+        mesh.uv = uv;
+        mesh.SetIndices(indices, MeshTopology.Lines, 0);
+
+        return mesh;
+    }
+
+    public static Mesh CreateTriangulationMesh(GK.VoronoiDiagram diagram, int[] indices)
+    {
+        Mesh mesh = new Mesh();
+
+        Vector3[] vertices = new Vector3[diagram.Triangulation.Vertices.Count];
+        Vector2[] uv = new Vector2[diagram.Triangulation.Vertices.Count];
+
+
+
+        for (int i = 0; i < diagram.Triangulation.Vertices.Count; i++)
+        {
+            vertices[i] = diagram.Triangulation.Vertices[i];
+            uv[i] = diagram.Triangulation.Vertices[i];
+        }
+
+        mesh.SetVertices(vertices);
+        mesh.uv = uv;
+        mesh.SetIndices( indices, MeshTopology.Lines, 0);
 
         return mesh;
     }
@@ -136,4 +305,33 @@ public class PathBuilder : MonoBehaviour
     {
         return Matrix4x4.TRS(PointsContainer.transform.position, Quaternion.identity, Vector3.one) * PointsContainer.transform.worldToLocalMatrix;
     }
+
+    #region Setters
+
+    public void SetShowAnglesMesh(bool value)
+    {
+        ShowAnglesMesh = value;
+    }
+
+    public void SetShowHullMesh(bool value)
+    {
+        ShowHullMesh = value;
+    }
+
+    public void SetShowVoronoiMesh(bool value)
+    {
+        ShowVoronoiMesh = value;
+    }
+
+    public void SetShowDelaunayMesh(bool value)
+    {
+        ShowDelaunayMesh = value;
+    }
+
+    public void SetShowPathMesh(bool value)
+    {
+        ShowPathMesh = value;
+    }
+
+    #endregion
 }
