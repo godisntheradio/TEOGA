@@ -66,9 +66,17 @@ namespace Graph
             return AStar(i, j);
         }
 
+        private void Clear()
+        {
+            foreach (var item in Nodes)
+            {
+                item.f = 0;
+            }
+        }
 
         public List<Edge<T>> AStar(Node<T> origin, Node<T> destination)
         {
+            Clear();
             var openList = new List<Node<T>>();
             var closedList = new List<Node<T>>();
             var path = new List<Edge<T>>();
@@ -106,7 +114,7 @@ namespace Graph
                 currentVertex = lowestF;
             }
 
-            for (Node<T> i = destination; i.Parent != null; i = i.Parent)
+            for (Node<T> i = destination; i != origin; i = i.Parent)
             {
                 path.Add(new Edge<T>(i.Parent, i, 0));
             }

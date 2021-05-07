@@ -47,6 +47,8 @@ public class PathBuilder : MonoBehaviour
     private Mesh PathMesh;
     public bool ShowPathMesh;
 
+    private GameObject FirstPathObject;
+    private GameObject SecondPathObject;
 
     #endregion
 
@@ -74,11 +76,6 @@ public class PathBuilder : MonoBehaviour
             Graphics.DrawMesh(AnglesMesh, MeshMatrix, AnglesMeshMaterial, 0);
         }
 
-        if (HullMesh != null && ShowHullMesh)
-        {
-            Graphics.DrawMesh(HullMesh, MeshMatrix, HullMeshMaterial, 0);
-        }
-
         if (VoronoiMesh != null && ShowVoronoiMesh)
         {
             Graphics.DrawMesh(VoronoiMesh, MeshMatrix, VoronoiMeshMaterial, 0);
@@ -89,10 +86,17 @@ public class PathBuilder : MonoBehaviour
             Graphics.DrawMesh(DelaunayMesh, MeshMatrix, DelaunayMeshMaterial, 0);
         }
 
+        if (HullMesh != null && ShowHullMesh)
+        {
+            Graphics.DrawMesh(HullMesh, MeshMatrix, HullMeshMaterial, 0);
+        }
+
+
         if (PathMesh != null && ShowPathMesh)
         {
             Graphics.DrawMesh(PathMesh, MeshMatrix, PathMeshMaterial, 0);
         }
+
     }
 
     // calcula o primeiro passo do graham scan
@@ -180,19 +184,20 @@ public class PathBuilder : MonoBehaviour
 
         GraphScreen.CreateDistances(LocationGraph);
 
-        BuildPath();
     }
     // calcula o A* 
     public void BuildPath()
     {
-        var originObj = Locations.Find((i) => i.name == "P_004");
-        var destinationObj = Locations.Find((i) => i.name == "P_007");
+        var originObj = FirstPathObject.GetComponent<MapLocation>();
+        var destinationObj = SecondPathObject.GetComponent<MapLocation>();
 
         var origin = LocationGraph.FindNode((i) => i.Item == originObj);
         var destination = LocationGraph.FindNode((i) => i.Item == destinationObj);
 
         LocationGraph.CalculateHeuristics(destination.Item, (c, d) => Vector3.Distance(c.transform.position, d.transform.position));
-        LocationGraph.AStar(origin, destination);
+        var path = LocationGraph.AStar(origin, destination);
+
+        PathMesh = CreatePathMesh(path);
     }
 
     public static Mesh CreateAngleLineMesh(ref List<Vector3> points)
@@ -301,6 +306,34 @@ public class PathBuilder : MonoBehaviour
         return mesh;
     }
 
+    public static Mesh CreatePathMesh(List<Graph.Edge<MapLocation>> path)
+    {
+        Mesh mesh = new Mesh();
+
+        Vector3[] vertices = new Vector3[path.Count * 2];
+        Vector2[] uv = new Vector2[path.Count * 2];
+        int[] indices = new int[path.Count * 2];
+
+        int j = 0;
+        // roda ao contrario por causa do jeito que monta o a *
+        for (int i = 0; i < path.Count; i++)
+        {
+            vertices[j] = path[i].Origin.Item.transform.position;
+            vertices[j + 1] = path[i].Destination.Item.transform.position;
+            uv[j] = path[i].Origin.Item.transform.position;
+            uv[j + 1] = path[i].Destination.Item.transform.position;
+            indices[j] = j;
+            indices[j + 1] = j + 1;
+            j += 2;
+        }
+
+        mesh.SetVertices(vertices);
+        mesh.uv = uv;
+        mesh.SetIndices(indices, MeshTopology.Lines, 0);
+
+        return mesh;
+    }
+
     public Matrix4x4 CreateMeshMatrix()
     {
         return Matrix4x4.TRS(PointsContainer.transform.position, Quaternion.identity, Vector3.one) * PointsContainer.transform.worldToLocalMatrix;
@@ -331,6 +364,34 @@ public class PathBuilder : MonoBehaviour
     public void SetShowPathMesh(bool value)
     {
         ShowPathMesh = value;
+    }
+
+    public void SetPathObject(GameObject value)
+    {
+        if (DelaunayMesh == null)
+            return;
+
+        if (FirstPathObject == null || SecondPathObject != null)
+        {
+            FirstPathObject = value;
+            SecondPathObject = null;
+            if (PathMesh != null)
+            {
+                PathMesh.Clear();
+                Destroy(PathMesh);
+                PathMesh = null;
+            }
+        }
+        else if (FirstPathObject != null || SecondPathObject == null)
+        {
+            SecondPathObject = value;
+        }
+
+        if (FirstPathObject != null && SecondPathObject != null)
+        {
+            BuildPath();
+        }
+
     }
 
     #endregion
