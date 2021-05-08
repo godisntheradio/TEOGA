@@ -66,6 +66,9 @@ namespace Graph
 
         public List<Edge<T>> AStar(int origin, int destination)
         {
+            if (origin == destination)
+                return null;
+
             var i = Nodes[origin];
             var j = Nodes[destination];
             return AStar(i, j);
@@ -81,6 +84,9 @@ namespace Graph
 
         public List<Edge<T>> AStar(Node<T> origin, Node<T> destination) // implementação do a* baseada no vídeo https://www.youtube.com/watch?v=eSOJ3ARN5FM
         {
+            if (origin == destination)
+                return null;
+
             Clear();
             var openList = new List<Node<T>>();
             var closedList = new List<Node<T>>();
