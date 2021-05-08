@@ -23,14 +23,19 @@ namespace Graph
         {
             for (int i = 0; i < nodes.Count; i++)
             {
-
-                this.Nodes.Add(new Node<T>(i, nodes[i]));
+                if (Nodes.Find(n => ReferenceEquals(n.Item, nodes[i])) == null)
+                    this.Nodes.Add(new Node<T>(i, nodes[i]));
             }
         }
 
         public Node<T> FindNode(System.Predicate<Node<T>> predicate)
         {
             return Nodes.Find(predicate);
+        }
+
+        public List<Node<T>> FindAllNodes(System.Predicate<Node<T>> predicate)
+        {
+            return Nodes.FindAll(predicate);
         }
 
         public void CreateEdges(int[] indices, System.Func<T, T, float> weightCalculator)
@@ -74,7 +79,7 @@ namespace Graph
             }
         }
 
-        public List<Edge<T>> AStar(Node<T> origin, Node<T> destination)
+        public List<Edge<T>> AStar(Node<T> origin, Node<T> destination) // implementação do a* baseada no vídeo https://www.youtube.com/watch?v=eSOJ3ARN5FM
         {
             Clear();
             var openList = new List<Node<T>>();
